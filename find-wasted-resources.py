@@ -16,7 +16,7 @@ import os
 import sys
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-import pprint
+import re
 
 from keystoneclient.v3.client import Client as keystone_client
 from novaclient.client import Client as nova_client
@@ -24,6 +24,12 @@ from novaclient.v2.contrib import instance_action
 
 # some of this is ripped straight out of the NeCTAR expiry handling tool
 ACTION_DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
+PT_RE = re.compile(r'^pt-\d+$')
+
+
+def is_personal_tenant(kc, tenant_id):
+    tenant = kc.projects.get(project=tenant_id)
+    return PT_RE.match(tenant.name)
 
 
 def get_nova_credentials():
@@ -75,9 +81,18 @@ def find_tenant_manager_role(kc):
             return r.id
 
 
+def find_tenant_member_role(kc):
+    roles = kc.roles.list()
+    for r in roles:
+        if r.name == 'Member':
+            return r.id
+
+
 def get_tenant_managers(kc, tenant_id):
     role_assignments = kc.role_assignments.list(project=tenant_id)
     tm_role = find_tenant_manager_role(kc)
+    if is_personal_tenant(kc, tenant_id):
+        tm_role = find_tenant_member_role(kc)
     tenant_manager_ids = []
     for ra in role_assignments:
         if ra.role['id'] == tm_role:
@@ -152,7 +167,8 @@ def main():
         print "  Instances:"
         for instance in result['instances']:
             flavor = get_flavor(nc, instance)
-            print "    %s (uuid %s, flavor %s)" % (instance.name, instance.id, flavor)
+            print "    %s (uuid %s, flavor %s)" % (instance.name,
+                                                   instance.id, flavor)
 
 
 if __name__ == '__main__':
