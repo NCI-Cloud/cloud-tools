@@ -7,22 +7,22 @@ import sys
 from util import get_nova_client, get_keystone_client
 from util import get_instance, is_instance_to_be_expired
 from util import output_report
+from util import parse_common_args
 
 
 def main():
-    if len(sys.argv) <= 1:
-        print "Usage: %s <instance uuid> [<instance uuid>...}" % (sys.argv[0])
-        sys.exit(1)
+
+    args = parse_common_args()
 
     nc = get_nova_client()
     kc = get_keystone_client()
     instances = []
-    for uuid in sys.argv[1:]:
+    for uuid in args.hosts:
         instance = get_instance(nc, uuid)
         if instance is None:
             print "Instance %s not found" % (uuid)
         else:
-            if is_instance_to_be_expired(nc, instance, days=190):
+            if is_instance_to_be_expired(nc, instance, days=args.days):
                 instances.append(instance)
 
     output_report(nc, kc, instances)

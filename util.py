@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import re
+import argparse
 
 from keystoneclient.v3.client import Client as keystone_client
 import novaclient
@@ -20,6 +21,18 @@ PT_RE = re.compile(r'^pt-\d+$')
 def is_personal_tenant(kc, tenant_id):
     tenant = kc.projects.get(project=tenant_id)
     return PT_RE.match(tenant.name)
+
+
+def parse_common_args():
+    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
+    parser.add_argument("-d", "--days", action='store', required=False,
+                        type=int, default='90', help=(
+                            "Number of days before an instance is considered"
+                            "defunct"
+                            ))
+    parser.add_argument("hosts", nargs="+", action='store',
+                        help="Hosts")
+    return parser.parse_args()
 
 
 def get_nova_credentials():
