@@ -157,5 +157,5 @@ def output_report(nc, kc, instances):
         print "  Instances:"
         for instance in result['instances']:
             flavor = get_flavor(nc, instance)
-            print "    %s (uuid %s, flavor %s)" % (instance.name,
+            print "    %s (uuid %s flavor %s)" % (instance.name,
                                                    instance.id, flavor)
