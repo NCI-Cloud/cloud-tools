@@ -28,26 +28,69 @@ def parse_args():
     parser.add_argument("--pt", action='store_true', required=False,
                         default=False,
                         help="Show only PT tenants")
+    parser.add_argument("--m2", action='store_true', required=False,
+                        default=False,
+                        help="Show only m2 flavours")
+    parser.add_argument("--regular", action='store_true', required=False,
+                        default=False,
+                        help="Show only full tenants")
+    parser.add_argument("--show-all-categories", action='store_true',
+                        required=False,
+                        default=False,
+                        help=(
+                            "Output all categories of instance, grouped by"
+                            "project"
+                        ))
 
     return parser.parse_args()
 
 
-def process_host(nc, kc, host, args):
+def process_host(nc, kc, host):
     instances = get_host_instances(nc, host)
-    for_display = []
-    if args.m1:
-        for instance in instances:
-            f = get_flavor(nc, instance)
-            if f[:2] == "m1":
-                for_display.append(instance)
-    elif args.pt:
-        for instance in instances:
-            t = get_tenant(kc, instance.tenant_id)
-            if t.name[:3] == "pt-":
-                for_display.append(instance)
-    else:
-        for_display = instances
-    return for_display
+
+    # categorisation functions
+    # Note: these are here so that they can access nc and kc. If they
+    # ever move into a class or similar they can become normal methods
+    def is_m1(instance):
+        f = get_flavor(nc, instance)
+        if f[:2] == "m1":
+            return True
+        return False
+
+    def is_m2(instance):
+        f = get_flavor(nc, instance)
+        if f[:2] == "m2":
+            return True
+        return False
+
+    def is_pt(instance):
+        t = get_tenant(kc, instance.tenant_id)
+        if t.name[:3] == "pt-":
+            return True
+        return False
+
+    def is_regular(instance):
+        if not is_pt(instance):
+            return True
+        return False
+
+    categories = {
+        'm1': is_m1,
+        'm2': is_m2,
+        'pt': is_pt,
+        'regular': is_regular,
+    }
+
+    groupings = {}
+
+    for instance in instances:
+        for category in categories.keys():
+            if categories[category](instance):
+                if category not in groupings:
+                    groupings[category] = []
+                groupings[category].append(instance)
+
+    return groupings
 
 
 def main():
@@ -56,11 +99,20 @@ def main():
 
     nc = get_nova_client()
     kc = get_keystone_client()
-    instances = []
+    groupings = {}
     for host in args.hosts:
-        instances.extend(process_host(nc, kc, host, args))
+        new_groupings = process_host(nc, kc, host)
+        for category in new_groupings.keys():
+            if category not in groupings:
+                groupings[category] = []
+            groupings[category].extend(new_groupings[category])
 
-    output_report(nc, kc, instances)
+    categories = groupings.keys()
+    categories.sort()
+    for category in categories:
+        if getattr(args, "show_all_categories") or getattr(args, category):
+            print("Category %s" % (category))
+            output_report(nc, kc, groupings[category])
 
 
 if __name__ == '__main__':
