@@ -105,19 +105,35 @@ def get_tenant_managers(kc, tenant_id):
     return tenant_managers
 
 
+# Memoising these functions
+tenants = {}
+flavors = {}
+instances = {}
+
+
 def get_tenant(kc, tenant_id):
+    if tenant_id in tenants:
+        return tenants[tenant_id]
     tenant = kc.projects.get(tenant_id)
+    tenants[tenant_id] = tenant
     return tenant
 
 
 def get_flavor(nc, instance):
+    if instance.flavor['id'] in flavors:
+        return flavors[instance.flavor['id']]
     flavor = nc.flavors.get(instance.flavor['id'])
+    flavors[instance.flavor['id']] = flavor.name
     return flavor.name
 
 
 def get_instance(nc, uuid):
+    if uuid in instances:
+        return instances[uuid]
     try:
-        return nc.servers.get(uuid)
+        instance = nc.servers.get(uuid)
+        instances[uuid] = instance
+        return instance
     except novaclient.exceptions.NotFound:
         return None
 
