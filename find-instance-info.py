@@ -12,9 +12,9 @@
 #
 # Should be fairly simple . . .
 
-import sys
-import argparse
 from util import get_host_instances
+from util import get_flavor
+from util import get_tenant
 from util import get_nova_client, get_keystone_client
 from util import output_report
 from util import parser_with_common_args
@@ -22,12 +22,32 @@ from util import parser_with_common_args
 
 def parse_args():
     parser = parser_with_common_args()
+    parser.add_argument("--m1", action='store_true', required=False,
+                        default=False,
+                        help="Show only m1 flavours")
+    parser.add_argument("--pt", action='store_true', required=False,
+                        default=False,
+                        help="Show only PT tenants")
+
     return parser.parse_args()
 
 
-def process_host(nc, host):
+def process_host(nc, kc, host, args):
     instances = get_host_instances(nc, host)
-    return instances
+    for_display = []
+    if args.m1:
+        for instance in instances:
+            f = get_flavor(nc, instance)
+            if f[:2] == "m1":
+                for_display.append(instance)
+    elif args.pt:
+        for instance in instances:
+            t = get_tenant(kc, instance.tenant_id)
+            if t.name[:3] == "pt-":
+                for_display.append(instance)
+    else:
+        for_display = instances
+    return for_display
 
 
 def main():
@@ -38,7 +58,7 @@ def main():
     kc = get_keystone_client()
     instances = []
     for host in args.hosts:
-        instances.extend(process_host(nc, host))
+        instances.extend(process_host(nc, kc, host, args))
 
     output_report(nc, kc, instances)
 

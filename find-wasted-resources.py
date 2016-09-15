@@ -12,16 +12,26 @@
 #
 # Should be fairly simple . . .
 
-import sys
-import argparse
 from util import get_host_instances, is_instance_to_be_expired
 from util import get_nova_client, get_keystone_client
 from util import output_report
-from util import parse_common_args
+from util import parser_with_common_args
+
+
+def parse_args():
+    parser = parser_with_common_args()
+    parser.add_argument("-d", "--days", action='store', required=False,
+                        type=int, default='90',
+                        help=(
+                            "number of days before an instance is considered"
+                            "defunct"
+                        ))
+    return parser.parse_args()
 
 
 def process_host(nc, host, days):
-    instances = get_host_instances(nc, host)
+    instances = get_host_instances(nc, host,
+                                   filter_criteria={'status': 'SHUTOFF'})
     for_expiry = []
     for instance in instances:
         if is_instance_to_be_expired(nc, instance, days=days):
@@ -31,7 +41,7 @@ def process_host(nc, host, days):
 
 def main():
     # nothing interesting here - just a list of hosts on the command line
-    args = parse_common_args()
+    args = parse_args()
 
     nc = get_nova_client()
     kc = get_keystone_client()

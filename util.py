@@ -23,16 +23,11 @@ def is_personal_tenant(kc, tenant_id):
     return PT_RE.match(tenant.name)
 
 
-def parse_common_args():
+def parser_with_common_args():
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
-    parser.add_argument("-d", "--days", action='store', required=False,
-                        type=int, default='90', help=(
-                            "Number of days before an instance is considered"
-                            "defunct"
-                            ))
     parser.add_argument("hosts", nargs="+", action='store',
                         help="Hosts")
-    return parser.parse_args()
+    return parser
 
 
 def get_nova_credentials():
@@ -66,8 +61,9 @@ def get_nova_client():
     return nc
 
 
-def get_host_instances(nc, host):
-    search_options = {'host': host, 'all_tenants': 1, 'status': 'SHUTOFF'}
+def get_host_instances(nc, host, filter_criteria={}):
+    search_options = {'host': host, 'all_tenants': 1}
+    search_options.update(filter_criteria)
     instances = nc.servers.list(search_opts=search_options)
     return instances
 
@@ -101,7 +97,7 @@ def get_tenant_managers(kc, tenant_id):
         if ra.role['id'] == tm_role:
             tenant_manager_ids.append(ra.user['id'])
     if len(tenant_manager_ids) == 0:
-        print "Tenant %s has no managers!" % (tenant_id)
+        print("Tenant %s has no managers!" % (tenant_id))
     tenant_managers = []
     for tm in tenant_manager_ids:
         user = kc.users.get(tm)
@@ -138,6 +134,10 @@ def is_instance_to_be_expired(nc, instance, days=180):
 
 
 def output_report(nc, kc, instances):
+    """
+    Given a list of instances that we're interested in, output information
+    about them on a per-project basis.
+    """
     results = {}
     for instance in instances:
         if instance.tenant_id in results:
@@ -150,12 +150,14 @@ def output_report(nc, kc, instances):
             }
 
     for result in results.values():
-        print "Tenant %s:" % (result['tenant'].name)
-        print "  Managers:"
+        print("Tenant %s:" % (result['tenant'].name))
+        print("  Managers:")
         for manager in result['managers']:
-            print "    Manager email: %s" % (manager.email)
-        print "  Instances:"
+            print("    Manager email: %s" % (manager.email))
+        print("  Instances:")
         for instance in result['instances']:
             flavor = get_flavor(nc, instance)
-            print "    %s (uuid %s flavor %s)" % (instance.name,
-                                                   instance.id, flavor)
+            print("    %s (uuid %s flavor %s status %s)" % (instance.name,
+                                                            instance.id,
+                                                            flavor,
+                                                            instance.status))
